@@ -25,7 +25,7 @@ save_confusion_matrices = False
 use_smote = False
 num_features = 100
 iterations = 3
-np.random.seed(42)
+#np.random.seed(42)
 
 #===LoadDataSet===
 df = pd.read_csv('../metadata_at_readmission.csv')

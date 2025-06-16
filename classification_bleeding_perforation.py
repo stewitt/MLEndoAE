@@ -13,14 +13,13 @@ from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedSh
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix
 from imblearn.over_sampling import SMOTE
-from sklearn.datasets import load_breast_cancer
 
 
 # === Local Modules ===
 from helper_func import (
-    perform_training, perform_training_rf_cv, perform_training_tabnet,
+    perform_training, perform_training_rf_cv,
     perform_training_catboost, estimate_stats,
-    perform_training_tabpfn, backward_feature_selection, select_features,
+    backward_feature_selection, select_features,
     print_thresholds, print_feature_importance, calc_confidence_intv
 )
 
@@ -34,7 +33,7 @@ iterations = 1
 num_test_samples = 500
 
 # Minimum number of features
-min_num_features = 500
+min_num_features = 100
 
 # Test on validation set (train using LLM-labeled training set)
 test_on_validation_set = True
@@ -45,6 +44,7 @@ test_on_valid_random_subsampling = False
 # Perform bootstrapping on the validation set only
 test_on_valid_bootstrapping = False
 
+
 # Select number of features that maximize AUC-PR within the training set
 select_n_best_features = True
 
@@ -52,10 +52,10 @@ select_n_best_features = True
 save_confusion_matrices = False
 
 # Use Gini importance instead of SHAP
-use_gini_importance = True
+use_gini_importance = False
 
 #Use random seed
-np.random.seed(42)
+#np.random.seed(43)
 
 #Use SMOTE
 use_smote = False
@@ -64,6 +64,7 @@ if test_on_valid_bootstrapping and test_on_valid_random_subsampling:
     raise Exception("Both cross validation and bootstrapping are activated. Choose only one.")
 
 # ==================================
+
 
 
 # === Load Data ===
@@ -142,19 +143,13 @@ cm_grid = []
 test_size_ = num_test_samples / result_df.shape[0]
 
 
-cancer = load_breast_cancer()
-X = cancer.data
-y = cancer.target
-#X = np.hstack((np.full((X.shape[0], 1), -1), X))
-
 
 for i in range(iterations):  # One run for now
     print(f"Run# {i}")
 
     # --- Train/Test Split ---
     X_train, X_test, y_train, y_test, indices_train, indices_test = train_test_split(
-        X, y, range(len(X)), test_size=test_size_, random_state=i * 8
-    )
+        X, y, range(len(X)), test_size=test_size_)
 
     if test_on_validation_set and not test_on_valid_random_subsampling and not test_on_valid_bootstrapping:
         X_train = result_df.values
@@ -165,8 +160,7 @@ for i in range(iterations):  # One run for now
     elif test_on_valid_random_subsampling:
         X_random_subsampling = validation_df.values
         X_train, X_test, y_train, y_test, indices_train, indices_test = train_test_split(
-            X_random_subsampling, y_test_val, range(len(X_random_subsampling)), test_size=0.2, random_state=i * 7
-        )
+            X_random_subsampling, y_test_val, range(len(X_random_subsampling)))
         y_train = y_val_llm[indices_train]
 
     elif test_on_valid_bootstrapping:
@@ -224,12 +218,13 @@ for i in range(iterations):  # One run for now
 
     print("\nTraining:")
     estimate_stats(y_train, y_pred_train, y_pred_train_prob, print_stats = True, show_plots = False)
+    
     print("\nTesting:")
     _, _, conf_matrix, roc, auc_pr = estimate_stats(y_test, y_pred_test, y_pred_test_prob, print_stats=True, show_plots=False)
 
     grid_roc.append(roc)
     grid_aucpr.append(auc_pr)
-    grid_baseline.append(y_test.sum() / len(y_test))
+    grid_baseline.append(np.sum(y_test)  / len(y_test))
 
     thresholds_cm = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.75]
     print("\nConfusion matrices for diferent thresholds:")
